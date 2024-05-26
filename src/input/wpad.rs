@@ -1,6 +1,5 @@
 use super::ControllerPort;
 use crate::ffi;
-use alloc::boxed::Box;
 use bitflags::bitflags;
 
 pub struct WPad {
@@ -95,8 +94,8 @@ impl WPad {
         buttons.contains(button)
     }
 
-    pub fn raw(&self) -> Box<ffi::WPADData> {
-        unsafe { Box::new(*ffi::WPAD_Data(self.id as i32)) }
+    pub fn raw(&self) -> &ffi::WPADData {
+        unsafe { &*(ffi::WPAD_Data(self.id as i32)) }
     }
 
     pub fn ir(&self) -> (f32, f32) {
