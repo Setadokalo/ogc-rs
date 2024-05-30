@@ -850,6 +850,177 @@ pub enum TexFilter {
     /// Bilinear filtering, no mipmap
     Linear = ffi::GX_LINEAR as _,
 }
+/// Texture filter types
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
+pub enum TexFormat {
+    TfA8 = ffi::GX_TF_A8 as u8,
+    TfCi14 = ffi::GX_TF_CI14 as u8,
+    TfCi4 = ffi::GX_TF_CI4 as u8,
+    TfCi8 = ffi::GX_TF_CI8 as u8,
+    TfCmpr = ffi::GX_TF_CMPR as u8,
+    TfI4 = ffi::GX_TF_I4 as u8,
+    TfI8 = ffi::GX_TF_I8 as u8,
+    TfIa4 = ffi::GX_TF_IA4 as u8,
+    TfIa8 = ffi::GX_TF_IA8 as u8,
+    TfRgb565 = ffi::GX_TF_RGB565 as u8,
+    TfRgb5a3 = ffi::GX_TF_RGB5A3 as u8,
+    TfRgba8 = ffi::GX_TF_RGBA8 as u8,
+}
+
+impl TexFormat {
+    pub fn size_bits(self) -> usize {
+        match self {
+            TexFormat::TfI4     => 4,
+            TexFormat::TfI8     => 8,
+            TexFormat::TfA8     => 8,
+            TexFormat::TfIa4    => 8,
+            TexFormat::TfIa8    => 16,
+            TexFormat::TfRgb565 => 16,
+            TexFormat::TfRgb5a3 => 16,
+            TexFormat::TfRgba8  => 32,
+            TexFormat::TfCi4    => 4,
+            TexFormat::TfCi8    => 8,
+            TexFormat::TfCi14   => 16,
+            TexFormat::TfCmpr   => 4,
+        }
+    }
+}
+impl TryFrom<u8> for TexFormat {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        const GX_TF_A8:     u8 = ffi::GX_TF_A8 as u8;
+        const GX_TF_CI14:   u8 = ffi::GX_TF_CI14 as u8;
+        const GX_TF_CI4:    u8 = ffi::GX_TF_CI4 as u8;
+        const GX_TF_CI8:    u8 = ffi::GX_TF_CI8 as u8;
+        const GX_TF_CMPR:   u8 = ffi::GX_TF_CMPR as u8;
+        const GX_TF_I4:     u8 = ffi::GX_TF_I4 as u8;
+        const GX_TF_I8:     u8 = ffi::GX_TF_I8 as u8;
+        const GX_TF_IA4:    u8 = ffi::GX_TF_IA4 as u8;
+        const GX_TF_IA8:    u8 = ffi::GX_TF_IA8 as u8;
+        const GX_TF_RGB565: u8 = ffi::GX_TF_RGB565 as u8;
+        const GX_TF_RGB5A3: u8 = ffi::GX_TF_RGB5A3 as u8;
+        const GX_TF_RGBA8:  u8 = ffi::GX_TF_RGBA8 as u8;
+        Ok(match value {
+            GX_TF_A8 => Self::TfA8,
+            GX_TF_CI14 => Self::TfCi14,
+            GX_TF_CI4 => Self::TfCi4,
+            GX_TF_CI8 => Self::TfCi8,
+            GX_TF_CMPR => Self::TfCmpr,
+            GX_TF_I4 => Self::TfI4,
+            GX_TF_I8 => Self::TfI8,
+            GX_TF_IA4 => Self::TfIa4,
+            GX_TF_IA8 => Self::TfIa8,
+            GX_TF_RGB565 => Self::TfRgb565,
+            GX_TF_RGB5A3 => Self::TfRgb5a3,
+            GX_TF_RGBA8 => Self::TfRgba8,
+            _ => return Err(())
+        })
+    }
+}
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct TevStage(u8);
+
+impl TevStage {
+    pub const SLOT_0:     Self = Self(ffi::GX_TEVSTAGE0   as _);
+    pub const SLOT_1:     Self = Self(ffi::GX_TEVSTAGE1   as _);
+    pub const SLOT_2:     Self = Self(ffi::GX_TEVSTAGE2   as _);
+    pub const SLOT_3:     Self = Self(ffi::GX_TEVSTAGE3   as _);
+    pub const SLOT_4:     Self = Self(ffi::GX_TEVSTAGE4   as _);
+    pub const SLOT_5:     Self = Self(ffi::GX_TEVSTAGE5   as _);
+    pub const SLOT_6:     Self = Self(ffi::GX_TEVSTAGE6   as _);
+    pub const SLOT_7:     Self = Self(ffi::GX_TEVSTAGE7   as _);
+    pub const SLOT_8:     Self = Self(ffi::GX_TEVSTAGE8   as _);
+    pub const SLOT_9:     Self = Self(ffi::GX_TEVSTAGE9   as _);
+    pub const SLOT_10:     Self = Self(ffi::GX_TEVSTAGE10 as _);
+    pub const SLOT_11:     Self = Self(ffi::GX_TEVSTAGE11 as _);
+    pub const SLOT_12:     Self = Self(ffi::GX_TEVSTAGE12 as _);
+    pub const SLOT_13:     Self = Self(ffi::GX_TEVSTAGE13 as _);
+    pub const SLOT_14:     Self = Self(ffi::GX_TEVSTAGE14 as _);
+    pub const SLOT_15:     Self = Self(ffi::GX_TEVSTAGE15 as _);
+}
+
+impl From<TevStage> for u8 {
+    fn from(t: TevStage) -> u8 {
+        t.0
+    }
+}
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct TexCoord(u8);
+
+impl TexCoord {
+    pub const NULL:    Self = Self(ffi::GX_TEXCOORDNULL as _);
+    pub const SLOT_0:     Self = Self(ffi::GX_TEXCOORD0    as _);
+    pub const SLOT_1:     Self = Self(ffi::GX_TEXCOORD1    as _);
+    pub const SLOT_2:     Self = Self(ffi::GX_TEXCOORD2    as _);
+    pub const SLOT_3:     Self = Self(ffi::GX_TEXCOORD3    as _);
+    pub const SLOT_4:     Self = Self(ffi::GX_TEXCOORD4    as _);
+    pub const SLOT_5:     Self = Self(ffi::GX_TEXCOORD5    as _);
+    pub const SLOT_6:     Self = Self(ffi::GX_TEXCOORD6    as _);
+    pub const SLOT_7:     Self = Self(ffi::GX_TEXCOORD7    as _);
+}
+
+impl From<TexCoord> for u8 {
+    fn from(t: TexCoord) -> u8 {
+        t.0
+    }
+}
+impl From<TexCoord> for u16 {
+    fn from(t: TexCoord) -> u16 {
+        t.0 as _
+    }
+}
+
+/// Enum representing the available texture map slots in the TEV pipeline.
+/// Since some functions take just a texture map, and others take a map
+/// that can be disabled, there is a generic parameter to control
+/// which behavior is valid for a given function.
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct TexMap<const DISABLEABLE: bool>(u32);
+
+impl<const DISABLEABLE: bool> TexMap<DISABLEABLE> {
+    pub const NULL: Self = Self(ffi::GX_TEXMAP_NULL);
+    pub const SLOT_0:     Self = Self(ffi::GX_TEXMAP0);
+    pub const SLOT_1:     Self = Self(ffi::GX_TEXMAP1);
+    pub const SLOT_2:     Self = Self(ffi::GX_TEXMAP2);
+    pub const SLOT_3:     Self = Self(ffi::GX_TEXMAP3);
+    pub const SLOT_4:     Self = Self(ffi::GX_TEXMAP4);
+    pub const SLOT_5:     Self = Self(ffi::GX_TEXMAP5);
+    pub const SLOT_6:     Self = Self(ffi::GX_TEXMAP6);
+    pub const SLOT_7:     Self = Self(ffi::GX_TEXMAP7);
+
+    fn slot_num(self) -> u32 {
+        self.0 & !ffi::GX_TEXMAP_DISABLE
+    }
+}
+
+impl TexMap<true> {
+    fn disabled(self) -> Self {
+        Self(self.0 | ffi::GX_TEXMAP_DISABLE)
+    }
+}
+
+impl From<TexMap<false>> for TexMap<true> {
+    fn from(value: TexMap<false>) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<TexMap<true>> for TexMap<false> {
+    fn from(value: TexMap<true>) -> Self {
+        Self(value.slot_num())
+    }
+}
+
+impl <const D: bool> From<TexMap<D>> for u32 {
+    fn from(t: TexMap<D>) -> u32 {
+        t.0
+    }
+}
 
 /// Texture wrap modes
 #[derive(Copy, Clone, Debug)]
@@ -858,6 +1029,22 @@ pub enum WrapMode {
     Clamp = ffi::GX_CLAMP as _,
     Repeat = ffi::GX_REPEAT as _,
     Mirror = ffi::GX_MIRROR as _,
+}
+
+impl TryFrom<u8> for WrapMode {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        const GX_CLAMP:  u8 = ffi::GX_CLAMP  as _;
+        const GX_REPEAT: u8 = ffi::GX_REPEAT as _;
+        const GX_MIRROR: u8 = ffi::GX_MIRROR as _;
+        Ok(match value {
+            GX_CLAMP  => Self::Clamp,
+            GX_REPEAT => Self::Repeat,
+            GX_MIRROR => Self::Mirror,
+            _ => return Err(())
+        })
+    }
 }
 
 #[repr(transparent)]
@@ -869,7 +1056,7 @@ impl Texture<'_> {
         img: &[u8],
         width: u16,
         height: u16,
-        format: u8,
+        format: TexFormat,
         wrap_s: WrapMode,
         wrap_t: WrapMode,
         mipmap: bool,
@@ -878,13 +1065,14 @@ impl Texture<'_> {
         assert_eq!(0, img.as_ptr().align_offset(32));
         assert!(width <= 1024, "max width for texture is 1024");
         assert!(height <= 1024, "max height for texture is 1024");
+        assert!(img.len() >= (width as usize * height as usize * format.size_bits() / 8));
         unsafe {
             ffi::GX_InitTexObj(
                 texture.as_ptr() as *mut _,
                 img.as_ptr() as *mut _,
                 width,
                 height,
-                format,
+                format as u8,
                 wrap_s as u8,
                 wrap_t as u8,
                 mipmap as u8,
@@ -898,7 +1086,7 @@ impl Texture<'_> {
         img: &[u8],
         width: u16,
         height: u16,
-        format: u8,
+        format: TexFormat,
         wrap: (WrapMode, WrapMode),
         mipmap: bool,
         tlut_name: u32,
@@ -913,7 +1101,7 @@ impl Texture<'_> {
                 img.as_ptr() as *mut _,
                 width,
                 height,
-                format,
+                format as u8,
                 wrap.0 as u8,
                 wrap.1 as u8,
                 mipmap as u8,
@@ -1743,20 +1931,20 @@ impl Gx {
 
     /// Simplified function to set various TEV parameters for this tevstage based on a predefined combiner mode.
     /// See [GX_SetTevOp](https://libogc.devkitpro.org/gx_8h.html#a68554713cdde7b45ae4d5ce156239cf8) for more.
-    pub fn set_tev_op(tevstage: u8, mode: u8) {
-        unsafe { ffi::GX_SetTevOp(tevstage, mode) }
+    pub fn set_tev_op(tevstage: TevStage, mode: u8) {
+        unsafe { ffi::GX_SetTevOp(tevstage.into(), mode) }
     }
 
     /// Specifies the texture and rasterized color that will be available as inputs to this TEV tevstage.
     /// See [GX_SetTevOrder](https://libogc.devkitpro.org/gx_8h.html#ae64799e52298de39efc74bf989fc57f5) for more.
-    pub fn set_tev_order(tevstage: u8, texcoord: u8, texmap: u32, color: u8) {
-        unsafe { ffi::GX_SetTevOrder(tevstage, texcoord, texmap, color) }
+    pub fn set_tev_order(tevstage: TevStage, texcoord: TexCoord, texmap: TexMap<true>, color: u8) {
+        unsafe { ffi::GX_SetTevOrder(tevstage.into(), texcoord.into(), texmap.into(), color) }
     }
 
     /// Specifies how texture coordinates are generated.
     /// See [GX_SetTexCoordGen](https://libogc.devkitpro.org/gx_8h.html#a7d3139b693ace5587c3224e7df2d8245) for more.
-    pub fn set_tex_coord_gen(texcoord: u16, tgen_typ: u32, tgen_src: u32, mtxsrc: u32) {
-        unsafe { ffi::GX_SetTexCoordGen(texcoord, tgen_typ, tgen_src, mtxsrc) }
+    pub fn set_tex_coord_gen(texcoord: TexCoord, tgen_typ: u32, tgen_src: u32, mtxsrc: u32) {
+        unsafe { ffi::GX_SetTexCoordGen(texcoord.into(), tgen_typ, tgen_src, mtxsrc) }
     }
 
     /// Invalidates the current caches of the Texture Memory (TMEM).
@@ -1785,8 +1973,8 @@ impl Gx {
     /// # Safety
     /// If the texture is a color-index texture, you **must** load the associated TLUT (using
     /// [`Gx::load_tlut()`]) before calling this function.
-    pub fn load_texture(obj: &Texture, mapid: u8) {
-        unsafe { ffi::GX_LoadTexObj((&obj.0) as *const _ as *mut _, mapid) }
+    pub fn load_texture(obj: &Texture, mapid: TexMap<false>) {
+        unsafe { ffi::GX_LoadTexObj((&obj.0) as *const _ as *mut _, u32::from(mapid) as u8) }
     }
 
     /// Sets the projection matrix.
@@ -1969,18 +2157,19 @@ impl Gx {
 
     /// Sets the parameters for the alpha compare function which uses the alpha output from the last active TEV stage.
     /// See [GX_SetClipMode](https://libogc.devkitpro.org/gx_8h.html#a3d348d7af8ded25b57352e956f43d974) for more.
-    pub fn set_clip_mode(mode: u8) {
-        unsafe { ffi::GX_SetClipMode(mode) }
+    pub fn set_clip_mode(enable: bool) {
+        // GX_CLIP_DISABLE is 1, so invert the enable parameter before int conversion
+        unsafe { ffi::GX_SetClipMode((!enable) as _) }
     }
 
     /// Wrapper around set_clip_mode, since its a simple enable or disbale.
     pub fn enable_clip() {
-        Gx::set_clip_mode(ffi::GX_CLIP_ENABLE as u8);
+        Gx::set_clip_mode(true);
     }
 
     ///Wrapper around set_clip_mode, since it a simple disable or enable.
     pub fn disable_clip() {
-        Gx::set_clip_mode(ffi::GX_CLIP_DISABLE as u8);
+        Gx::set_clip_mode(false);
     }
 
     /// Allows the CPU to write color directly to the Embedded Frame Buffer (EFB) at position x, y.
