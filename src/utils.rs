@@ -254,3 +254,22 @@ impl Drop for Buf32 {
 		}
 	}
 }
+/// Include bytes from a file aligned to a 32-byte boundary.
+/// This is necessary for things like TPL files to be loaded
+/// without copying image data to a second buffer before
+/// uploading it to the GPU.
+#[macro_export]
+macro_rules! include_bytes_aligned {
+    ($path:literal) => {{
+        #[repr(align(32))]
+        pub struct AlignedAs<Bytes: ?Sized> {
+            pub bytes: Bytes,
+        }
+
+        static ALIGNED: &AlignedAs::<[u8]> = &AlignedAs {
+            bytes: *include_bytes!($path),
+        };
+
+        &ALIGNED.bytes
+    }};
+}
