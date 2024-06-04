@@ -63,8 +63,12 @@ mod console_printing {
     #[macro_export]
     macro_rules! println {
         () => (print!("\n"));
-        ($fmt:expr) => (print!(concat!($fmt, "\n")));
-        ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+      //   ($fmt:expr) => (print!(concat!($fmt, "\n")));
+        ($fmt:expr $(, $($arg:tt)*)?) => {
+            let mut s = ::alloc::fmt::format(format_args!($fmt $(, $($arg)*)?));
+				s.push('\n');
+            $crate::console::Console::print(&s);
+		  }
     }
 }
 
