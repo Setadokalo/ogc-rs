@@ -41,6 +41,9 @@ pub mod audio;
 //MP3Player impl
 pub mod mp3player;
 
+// Sysconf Implementation
+pub mod conf;
+
 // Console Implementation
 pub mod console;
 
