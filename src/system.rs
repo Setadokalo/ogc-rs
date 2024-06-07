@@ -422,4 +422,16 @@ impl System {
     pub fn system_time() -> u64 {
         unsafe { ffi::SYS_Time() }
     }
+
+    /// Toggle reporting of stderr to the dolphin log.
+    /// If `stdout` is `true`, also redirect stdout.
+    /// 
+    /// Calling this before Console::init will have no effect
+    /// as it will be overridden to `false`.
+    /// 
+    /// OSREPORT Logging must be enabled in Dolphin
+    /// for this to have any effect.
+    pub fn stdio_report(stdout: bool) {
+        unsafe { ffi::SYS_STDIO_Report(stdout); }
+    }
 }
