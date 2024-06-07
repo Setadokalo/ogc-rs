@@ -833,6 +833,35 @@ impl Light {
     }
 }
 
+#[repr(u32)]
+pub enum PosNmlMatrixSlot {
+    Slot0 = ffi::GX_PNMTX0 as _,
+    Slot1 = ffi::GX_PNMTX1 as _,
+    Slot2 = ffi::GX_PNMTX2 as _,
+    Slot3 = ffi::GX_PNMTX3 as _,
+    Slot4 = ffi::GX_PNMTX4 as _,
+    Slot5 = ffi::GX_PNMTX5 as _,
+    Slot6 = ffi::GX_PNMTX6 as _,
+    Slot7 = ffi::GX_PNMTX7 as _,
+    Slot8 = ffi::GX_PNMTX8 as _,
+    Slot9 = ffi::GX_PNMTX9 as _,
+}
+
+#[repr(u32)]
+pub enum TexMatrixSlot {
+    Identity = ffi::GX_IDENTITY as _,
+    Slot0 = ffi::GX_TEXMTX0 as _,
+    Slot1 = ffi::GX_TEXMTX1 as _,
+    Slot2 = ffi::GX_TEXMTX2 as _,
+    Slot3 = ffi::GX_TEXMTX3 as _,
+    Slot4 = ffi::GX_TEXMTX4 as _,
+    Slot5 = ffi::GX_TEXMTX5 as _,
+    Slot6 = ffi::GX_TEXMTX6 as _,
+    Slot7 = ffi::GX_TEXMTX7 as _,
+    Slot8 = ffi::GX_TEXMTX8 as _,
+    Slot9 = ffi::GX_TEXMTX9 as _,
+}
+
 /// Texture filter types
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
@@ -2064,16 +2093,16 @@ impl Gx {
 
     /// Used to load a 3x4 modelview matrix mt into matrix memory at location pnidx.
     /// See [GX_LoadPosMtxImm](https://libogc.devkitpro.org/gx_8h.html#a90349e713128a1fa4fd6048dcab7b5e7) for more.
-    pub fn load_pos_mtx_imm(mt: &mut Mtx34, pnidx: u32) {
-        unsafe { ffi::GX_LoadPosMtxImm(mt as *mut _, pnidx) }
+    pub fn load_pos_mtx_imm(mt: &mut Mtx34, pnidx: PosNmlMatrixSlot) {
+        unsafe { ffi::GX_LoadPosMtxImm(mt as *mut _, pnidx as _) }
     }
 
-    pub fn load_nrm_mtx_imm(mt: &mut Mtx34, pnidx: u32) {
-        unsafe { ffi::GX_LoadNrmMtxImm(mt as *mut _, pnidx) }
+    pub fn load_nrm_mtx_imm(mt: &mut Mtx34, pnidx: PosNmlMatrixSlot) {
+        unsafe { ffi::GX_LoadNrmMtxImm(mt as *mut _, pnidx as _) }
     }
 
-    pub fn load_tex_mtx_imm(mt: &mut Mtx34, pnidx: u32) {
-        unsafe { ffi::GX_LoadTexMtxImm(mt as *mut _, pnidx, ffi::GX_MTX3x4 as _) }
+    pub fn load_tex_mtx_imm(mt: &mut Mtx34, pnidx: TexMatrixSlot) {
+        unsafe { ffi::GX_LoadTexMtxImm(mt as *mut _, pnidx as _, ffi::GX_MTX3x4 as _) }
     }
 
     /// Enables or disables dithering.

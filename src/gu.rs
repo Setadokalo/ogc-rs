@@ -9,7 +9,7 @@ use libm::tanf;
 
 use crate::{
     ffi::{self, guVector, Mtx as Mtx34, Mtx44},
-    gx::{self, Gx},
+    gx::{self, Gx, PosNmlMatrixSlot, TexMatrixSlot},
 };
 
 #[repr(u8)]
@@ -592,13 +592,13 @@ impl Mat3x4 {
         );
     }
 
-    pub fn load_as_pos_mtx(&mut self, pnidx: u32) {
+    pub fn load_as_pos_mtx(&mut self, pnidx: PosNmlMatrixSlot) {
         Gx::load_pos_mtx_imm(self.as_array_mut(), pnidx);
     }
-    pub fn load_as_nrm_mtx(&mut self, pnidx: u32) {
+    pub fn load_as_nrm_mtx(&mut self, pnidx: PosNmlMatrixSlot) {
         Gx::load_nrm_mtx_imm(self.as_array_mut(), pnidx);
     }
-    pub fn load_as_tex_mtx(&mut self, pnidx: u32) {
-        Gx::load_tex_mtx_imm(self.as_array_mut(), pnidx);
+    pub fn load_as_tex_mtx(&mut self, texidx: TexMatrixSlot) {
+        Gx::load_tex_mtx_imm(self.as_array_mut(), texidx);
     }
 }
