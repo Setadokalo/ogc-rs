@@ -8,7 +8,7 @@ use alloc::boxed::Box;
 use core::{convert::TryFrom, ffi::c_void, mem, ptr};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct RenderConfig {
     pub tv_type: u32,
     pub framebuffer_width: u16,
