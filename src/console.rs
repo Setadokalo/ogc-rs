@@ -3,7 +3,6 @@
 //! This module implements a safe wrapper around the console functions.
 
 use crate::{ffi, video::Video, OgcError, Result};
-use alloc::string::String;
 use core::ptr;
 
 /// Represents the console service.
@@ -81,30 +80,13 @@ impl Console {
 
     /// Print a formatted string to the console screen through ``printf``.
     pub fn print(formatted_string: &str) {
-        // Create a buffer.
-        let mut buffer = String::new();
-
-        // Credit to ``lemarcuspoilus`` on github for this method.
-        let offset_to_contents = {
-            let mut it = formatted_string.char_indices();
-            loop {
-                let (i, ch) = match it.next() {
-                    Some(pair) => pair,
-                    None => return,
-                };
-                match ch {
-                    '\n' | '\r' => buffer.push(ch),
-                    _ => break i,
-                }
+        // Split and print every 256 bytes to avoid buffer overflow in libogc
+        for substr in formatted_string.as_bytes().chunks(256) {
+            unsafe {
+                // printf interprets precision for %s as number of chars to read,
+                // so we can use it to avoid a copy to a null-terminated buffer
+                libc::printf(b"%.*s\0".as_ptr(), substr.len(), substr.as_ptr());
             }
-        };
-
-        buffer.push_str(&formatted_string[offset_to_contents..]);
-        buffer.push('\0');
-
-        // Print the buffer.
-        unsafe {
-            libc::printf(buffer.as_ptr());
         }
     }
 }
