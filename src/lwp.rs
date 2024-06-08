@@ -6,7 +6,7 @@ use crate::ffi;
 use core::ffi::c_void;
 
 /// A thread context handle.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Thread {
     handle: ffi::lwp_t,
