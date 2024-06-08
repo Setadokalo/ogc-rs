@@ -80,6 +80,8 @@ impl Console {
 
     /// Print a formatted string to the console screen through ``printf``.
     pub fn print(formatted_string: &str) {
+        // This matches the behaviour of the old implementation, but I don't really get the point
+        if !formatted_string.contains(|c| c != '\n' && c != '\r') { return }
         // Split and print every 256 bytes to avoid buffer overflow in libogc
         for substr in formatted_string.as_bytes().chunks(256) {
             unsafe {
