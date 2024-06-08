@@ -51,7 +51,7 @@ impl Audio {
                 "Data is not aligned correctly."
             );
             assert_eq!(0, data.len() % 32, "Data length is not a multiple of 32.");
-
+            // TODO: Can we somehow comply with strict provenance here?
             ffi::AUDIO_InitDMA(data.as_ptr() as u32, data.len() as u32);
         }
     }

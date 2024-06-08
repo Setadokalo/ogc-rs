@@ -23,8 +23,8 @@ impl Tpl {
         let mut tpl = Self {
             type_: FileType::Memory,
             ntextures: 0,
-            texdesc: 0 as _,
-            tpl_file: 0 as _,
+            texdesc:  core::ptr::null_mut(),
+            tpl_file: core::ptr::null_mut(),
         };
         unsafe {
             ffi::TPL_OpenTPLFromMemory(tpl.raw(), memory.as_mut_ptr() as *mut _, memory.len() as _)

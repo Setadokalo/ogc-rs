@@ -25,6 +25,7 @@
 #![feature(slice_ptr_get)]
 #![feature(allocator_api)]
 #![feature(strict_provenance)]
+#![warn(fuzzy_provenance_casts, lossy_provenance_casts)]
 
 extern crate alloc;
 

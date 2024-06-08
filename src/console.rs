@@ -58,10 +58,10 @@ impl Console {
 
     /// Retrieve the columns and rows of the current console.
     pub fn get_metrics() -> (i32, i32) {
-        let coords: (i32, i32) = (0, 0);
+        let mut coords: (i32, i32) = (0, 0);
 
         unsafe {
-            ffi::CON_GetMetrics(coords.0 as *mut i32, coords.1 as *mut i32);
+            ffi::CON_GetMetrics((&mut coords.0) as *mut i32, (&mut coords.1) as *mut i32);
         }
 
         coords
@@ -69,10 +69,10 @@ impl Console {
 
     /// Retrieve the current cursor position of the current console.
     pub fn get_position() -> (i32, i32) {
-        let coords: (i32, i32) = (0, 0);
+        let mut coords: (i32, i32) = (0, 0);
 
         unsafe {
-            ffi::CON_GetPosition(coords.0 as *mut i32, coords.1 as *mut i32);
+            ffi::CON_GetPosition((&mut coords.0) as *mut i32, (&mut coords.1) as *mut i32);
         }
 
         coords

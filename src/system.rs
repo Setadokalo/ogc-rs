@@ -392,7 +392,8 @@ impl System {
     /// Protect Range
     pub fn protect_range(
         channel: MemoryProtectChannels,
-        address: u32,
+        // TODO: Why was this a u32? What is this used for?
+        address: *const c_void,
         bytes: u32,
         control: MemoryProtectModes,
     ) {
