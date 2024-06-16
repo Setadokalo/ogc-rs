@@ -4,12 +4,205 @@
 
 use crate::{ffi, video::RenderConfig, OgcError, Result};
 use alloc::boxed::Box;
-use core::{ffi::c_void, mem, ptr, time::Duration};
+use core::{ffi::c_void, marker::PhantomData, mem, ptr, time::Duration};
 use num_enum::IntoPrimitive;
 
 /// Represents the system service.
 /// The initialization of this service is done in the crt0 startup code.
 pub struct System;
+
+#[derive(Debug)]
+// T must be Send since we send it across threads, but it only needs to be Sync
+// if we don't take ownership (since we're then sharing references across threads)
+pub struct Alarm<'a, T: Send>(u32, Option<Box<T>>, PhantomData<&'a u8>);
+
+// Generic impl for all T, Sync or not
+impl<'a, T: Send> Alarm<'a, T> {
+
+    /// Cancel the alarm, but do not remove from the list of contexts.
+    pub fn cancel_alarm(&mut self) {
+        let r = unsafe { ffi::SYS_CancelAlarm(self.0) };
+
+        assert!(r == 0, "Failed to set periodic alarm - shouldn't be possible without ogc_sys raw usage");
+    }
+
+    /// Set the alarm parameters for a one-shot alarm, add to the list of alarms and start.
+    /// 
+    /// This function can softlock the console if called with a `delay` of 0 seconds
+    /// on an alarm that's already set.
+    pub fn set_owning(
+        &mut self,
+        delay: Duration, 
+        callback: extern "C" fn(alarm: u32, cb_arg: &'a T), 
+        cb_arg: T
+    ) {
+        // Convert Duration to timespec
+        let timespec: *const ffi::timespec = &ffi::timespec {
+            tv_sec: delay.as_secs() as i64,
+            tv_nsec: delay.as_nanos() as i32,
+        };
+        self.1 = Some(Box::new(cb_arg));
+        // Option<&T> is ABI compatible with *mut T.
+        // *mut T is ABI compatible with *mut U
+        // if <T as Pointee>::Metadata == <U as Pointee>::Metadata.
+        // For all Sized types, <T as Pointee>::Metadata = ().
+        let callback = unsafe { 
+            mem::transmute::<
+                extern "C" fn(alarm: u32, cb_arg: &'a T),
+                extern "C" fn(alarm: u32, cb_arg: *mut c_void)
+            >(callback)
+        };
+        let r = unsafe { ffi::SYS_SetAlarm(
+            self.0, 
+            timespec, 
+            Some(callback), 
+            ((&**self.1.as_ref().unwrap()) as *const T)
+                .cast_mut()
+                .cast::<c_void>(),
+        ) };
+
+        assert!(r == 0, "Failed to set alarm - shouldn't be possible without ogc_sys raw usage");
+    }
+
+    /// Set the alarm parameters for a periodic alarm, add to the list of alarms and start.
+    /// The alarm and interval persists as long as SYS_CancelAlarm() isn't called.
+    /// 
+    /// This function can softlock the console if called with a `delay` of 0 seconds
+    /// on an alarm that's already set.
+    pub fn set_periodic_owning(
+        &mut self,
+        start_delay: Duration,
+        period: Duration,
+        callback: extern "C" fn(alarm: u32, cb_arg: &'a T),
+        callback_data: T,
+    ) {
+        // Convert Duration to timespec
+        let timespec_start: *const ffi::timespec = &ffi::timespec {
+            tv_sec: start_delay.as_secs() as i64,
+            tv_nsec: start_delay.as_nanos() as i32,
+        };
+
+        let timespec_period: *const ffi::timespec = &ffi::timespec {
+            tv_sec: period.as_secs() as i64,
+            tv_nsec: period.as_nanos() as i32,
+        };
+        self.1 = Some(Box::new(callback_data));
+        // See set_alarm for safety explanation.
+        let callback = unsafe { 
+            mem::transmute::<
+                extern "C" fn(alarm: u32, cb_arg: &'a T),
+                extern "C" fn(alarm: u32, cb_arg: *mut c_void)
+            >(callback)
+        };
+        let r = unsafe {
+            ffi::SYS_SetPeriodicAlarm(
+                self.0,
+                timespec_start,
+                timespec_period,
+                Some(callback),
+                ((&**self.1.as_ref().unwrap()) as *const T)
+                    .cast_mut()
+                    .cast::<c_void>(),
+            )
+        };
+
+        assert!(r == 0, "Failed to set periodic alarm - shouldn't be possible without ogc_sys raw usage");
+    }
+}
+// T that are Sync don't need us to take ownership to share
+impl<'a, T: Send + Sync> Alarm<'a, T> {
+    /// Set the alarm parameters for a one-shot alarm, add to the list of alarms and start.
+    /// 
+    /// This function can softlock the console if called with a `delay` of 0 seconds
+    /// on an alarm that's already set.
+    pub fn set(
+        &mut self,
+        delay: Duration, 
+        callback: extern "C" fn(alarm: u32, cb_arg: Option<&'a T>), 
+        cb_arg: impl Into<Option<&'a T>>
+    ) {
+        let cb_arg = cb_arg.into();
+        // Convert Duration to timespec
+        let timespec: *const ffi::timespec = &ffi::timespec {
+            tv_sec: delay.as_secs() as i64,
+            tv_nsec: delay.as_nanos() as i32,
+        };
+
+        // Option<&T> is ABI compatible with *mut T.
+        // *mut T is ABI compatible with *mut U
+        // if <T as Pointee>::Metadata == <U as Pointee>::Metadata.
+        // For all Sized types, <T as Pointee>::Metadata = ().
+        let callback = unsafe { 
+            mem::transmute::<
+                extern "C" fn(alarm: u32, cb_arg: Option<&'a T>),
+                extern "C" fn(alarm: u32, cb_arg: *mut c_void)
+            >(callback)
+        };
+        let r = unsafe { ffi::SYS_SetAlarm(
+            self.0, 
+            timespec, 
+            Some(callback), 
+            cb_arg.map_or(ptr::null(), ptr::from_ref)
+                .cast_mut()
+                .cast()
+        ) };
+
+        assert!(r == 0, "Failed to set alarm - shouldn't be possible without ogc_sys raw usage");
+    }
+
+    /// Set the alarm parameters for a periodic alarm, add to the list of alarms and start.
+    /// The alarm and interval persists as long as SYS_CancelAlarm() isn't called.
+    /// 
+    /// This function can softlock the console if called with a `start_delay` of 0 seconds
+    /// on an alarm that's already set.
+    pub fn set_periodic(
+        &mut self,
+        start_delay: Duration,
+        period: Duration,
+        callback: extern "C" fn(alarm: u32, cb_arg: Option<&'a T>),
+        callback_data: impl Into<Option<&'a T>>,
+    ) {
+        let callback_data = callback_data.into();
+        // Convert Duration to timespec
+        let timespec_start: *const ffi::timespec = &ffi::timespec {
+            tv_sec: start_delay.as_secs() as i64,
+            tv_nsec: start_delay.as_nanos() as i32,
+        };
+
+        let timespec_period: *const ffi::timespec = &ffi::timespec {
+            tv_sec: period.as_secs() as i64,
+            tv_nsec: period.as_nanos() as i32,
+        };
+        // See set_alarm for safety explanation.
+        let callback = unsafe { 
+            mem::transmute::<
+                extern "C" fn(alarm: u32, cb_arg: Option<&'a T>),
+                extern "C" fn(alarm: u32, cb_arg: *mut c_void)
+            >(callback)
+        };
+        let r = unsafe {
+            ffi::SYS_SetPeriodicAlarm(
+                self.0,
+                timespec_start,
+                timespec_period,
+                Some(callback),
+                callback_data.map_or(ptr::null(), ptr::from_ref)
+                    .cast_mut()
+                    .cast(),
+            )
+        };
+
+        assert!(r == 0, "Failed to set periodic alarm - shouldn't be possible without ogc_sys raw usage");
+    }
+}
+
+impl<T: Send> Drop for Alarm<'_, T> {
+    fn drop(&mut self) {
+        let r = unsafe { ffi::SYS_RemoveAlarm(self.0) };
+
+        assert!(r == 0, "Failed to remove alarm - shouldn't be possible without ogc_sys raw usage");
+    }
+}
 
 /// OS Reset Types
 #[derive(IntoPrimitive, Debug, Eq, PartialEq)]
@@ -107,123 +300,15 @@ impl System {
     }
 
     /// Create and initialize sysalarm structure.
-    pub fn create_alarm(context: &mut u32) -> Result<()> {
-        let r = unsafe { ffi::SYS_CreateAlarm(context) };
+    pub fn create_alarm<'a, T: Send>() -> Result<Alarm<'a, T>> {
+        let mut a = 0;
+        let r = unsafe { ffi::SYS_CreateAlarm(&mut a) };
 
         if r < 0 {
             Err(OgcError::System("system failed to create alarm".into()))
         } else {
-            Ok(())
+            Ok(Alarm(a, None, PhantomData))
         }
-    }
-
-    /// Cancel the alarm, but do not remove from the list of contexts.
-    pub fn cancel_alarm(context: u32) -> Result<()> {
-        let r = unsafe { ffi::SYS_CancelAlarm(context) };
-
-        if r < 0 {
-            Err(OgcError::System("system failed to cancel alarm".into()))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Remove the given alarm context from the list of contexts and destroy it.
-    pub fn remove_alarm(context: u32) -> Result<()> {
-        let r = unsafe { ffi::SYS_RemoveAlarm(context) };
-
-        if r < 0 {
-            Err(OgcError::System("system failed to remove alarm".into()))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Set the alarm parameters for a one-shot alarm, add to the list of alarms and start.
-    pub fn set_alarm<T>(
-        context: u32, 
-        fire_time: Duration, 
-        callback: extern "C" fn(alarm: u32, cb_arg: Option<&'static T>), 
-        cb_arg: Option<&'static T>
-    ) -> Result<()>{
-        // Convert Duration to timespec
-        let timespec: *const ffi::timespec = &ffi::timespec {
-            tv_sec: fire_time.as_secs() as i64,
-            tv_nsec: fire_time.as_nanos() as i32,
-        };
-
-        // Option<&T> is ABI compatible with *mut T.
-        // *mut T is ABI compatible with *mut U
-        // if <T as Pointee>::Metadata == <U as Pointee>::Metadata.
-        // For all Sized types, <T as Pointee>::Metadata = ().
-        let callback = unsafe { 
-            mem::transmute::<
-                extern "C" fn(alarm: u32, cb_arg: Option<&'static T>),
-                extern "C" fn(alarm: u32, cb_arg: *mut c_void)
-            >(callback)
-        };
-        let r = unsafe { ffi::SYS_SetAlarm(
-            context, 
-            timespec, 
-            Some(callback), 
-            cb_arg.map_or(ptr::null(), ptr::from_ref)
-                .cast_mut()
-                .cast()
-        ) };
-
-        if r < 0 {
-            Err(OgcError::System("system failed to set alarm".into()))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Set the alarm parameters for a periodic alarm, add to the list of alarms and start.
-    /// The alarm and interval persists as long as SYS_CancelAlarm() isn't called.
-    pub fn set_periodic_alarm<T>(
-        context: u32,
-        time_start: Duration,
-        time_period: Duration,
-        callback: extern "C" fn(alarm: u32, cb_arg: Option<&'static T>),
-        callback_data: Option<&'static T>,
-    ) -> Result<()>
-    {
-            // Convert Duration to timespec
-            let timespec_start: *const ffi::timespec = &ffi::timespec {
-                tv_sec: time_start.as_secs() as i64,
-                tv_nsec: time_start.as_nanos() as i32,
-            };
-
-            let timespec_period: *const ffi::timespec = &ffi::timespec {
-                tv_sec: time_period.as_secs() as i64,
-                tv_nsec: time_period.as_nanos() as i32,
-            };
-            // See set_alarm for safety explanation.
-            let callback = unsafe { 
-                mem::transmute::<
-                    extern "C" fn(alarm: u32, cb_arg: Option<&'static T>),
-                    extern "C" fn(alarm: u32, cb_arg: *mut c_void)
-                >(callback)
-            };
-            let r = unsafe {
-                ffi::SYS_SetPeriodicAlarm(
-                    context,
-                    timespec_start,
-                    timespec_period,
-                    Some(callback),
-                    callback_data.map_or(ptr::null(), ptr::from_ref)
-                        .cast_mut()
-                        .cast(),
-                )
-            };
-
-            if r < 0 {
-                Err(OgcError::System(
-                    "system failed to set periodic alarm".into(),
-                ))
-            } else {
-                Ok(())
-            }
     }
 
     /// Init Font
