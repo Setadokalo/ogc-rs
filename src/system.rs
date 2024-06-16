@@ -4,6 +4,7 @@
 
 use crate::{ffi, video::RenderConfig, OgcError, Result};
 use alloc::boxed::Box;
+use ogc_sys::TB_TIMER_CLOCK;
 use core::{ffi::c_void, marker::PhantomData, mem, ptr, time::Duration};
 use num_enum::IntoPrimitive;
 
@@ -201,6 +202,52 @@ impl<T: Send> Drop for Alarm<'_, T> {
         let r = unsafe { ffi::SYS_RemoveAlarm(self.0) };
 
         assert!(r == 0, "Failed to remove alarm - shouldn't be possible without ogc_sys raw usage");
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord)]
+pub struct Instant {
+    pub secs: u64,
+    pub nanos: u32,
+}
+
+impl Instant {
+    pub fn now() -> Self {
+        Self::from_raw(System::system_time_raw())
+    }
+
+    pub fn from_raw(raw: u64) -> Self {
+        const TICKS_PER_SEC: u64 = ffi::TB_TIMER_CLOCK as u64 * 1000;
+        let secs = raw / TICKS_PER_SEC;
+        Self {
+            secs,
+            nanos: (((raw % TICKS_PER_SEC) * 4000) / (TB_TIMER_CLOCK as u64 / 250)) as u32
+        }
+    }
+    pub fn elapsed(&self) -> Duration {
+        Self::now().duration_since(*self)
+    }
+
+    pub fn duration_since(&self, earlier: Instant) -> Duration {
+        if earlier.secs > self.secs || (earlier.secs == self.secs && earlier.nanos > self.nanos) {
+            return Duration::new(0, 0);
+        }
+        let dur_s = self.secs - earlier.secs;
+        if self.nanos < earlier.nanos {
+            Duration::new(dur_s - 1, (self.nanos + 1_000_000_000) - earlier.nanos)
+        } else {
+            Duration::new(dur_s, self.nanos - earlier.nanos)
+        }
+    }
+}
+
+impl PartialOrd<Instant> for Instant {
+    fn partial_cmp(&self, other: &Instant) -> Option<core::cmp::Ordering> {
+        match self.secs.partial_cmp(&other.secs) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.nanos.partial_cmp(&other.nanos)
     }
 }
 
@@ -524,9 +571,14 @@ impl System {
         unsafe { ffi::SYS_GetHollywoodRevision() }
     }
 
-    /// Get system time.
-    pub fn system_time() -> u64 {
+    /// Get system time in ticks.
+    pub fn system_time_raw() -> u64 {
         unsafe { ffi::SYS_Time() }
+    }
+
+    /// Get system time.
+    pub fn system_time() -> Instant {
+        Instant::now()
     }
 
     /// Toggle reporting of stderr to the dolphin log.
