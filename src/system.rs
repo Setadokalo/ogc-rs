@@ -6,7 +6,7 @@ use crate::{ffi, video::RenderConfig, OgcError, Result};
 use alloc::boxed::Box;
 use ogc_sys::TB_TIMER_CLOCK;
 use core::{ffi::c_void, marker::PhantomData, mem, ptr, time::Duration};
-use num_enum::IntoPrimitive;
+use num_enum::{TryFromPrimitive, IntoPrimitive};
 
 /// Represents the system service.
 /// The initialization of this service is done in the crt0 startup code.
@@ -252,8 +252,8 @@ impl PartialOrd<Instant> for Instant {
 }
 
 /// OS Reset Types
-#[derive(IntoPrimitive, Debug, Eq, PartialEq)]
-#[repr(u32)]
+#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(i32)]
 pub enum ResetTypes {
     Restart = 0,
     HotReset = 1,
@@ -511,9 +511,9 @@ impl System {
     }
 
     /// Reset System
-    pub fn reset_system(reset: i32, reset_type: ResetTypes, force_menu: i32) {
+    pub fn reset_system(reset: ResetTypes, reset_type: u32, force_menu: i32) {
         unsafe {
-            ffi::SYS_ResetSystem(reset, reset_type.into(), force_menu);
+            ffi::SYS_ResetSystem(reset.into(), reset_type, force_menu);
         }
     }
 
@@ -526,9 +526,13 @@ impl System {
     ///
     /// Note: `ctx` is always null in the current version of libogc,
     /// but is still a required parameter.
-    pub fn set_reset_callback(callback: extern "C" fn(irq: u32, ctx: *mut c_void)) {
+    pub fn set_reset_callback(callback: extern "C" fn(irq: ResetTypes, ctx: *mut c_void)) {
         unsafe {
             // TODO: Do something with the returned callback.
+            let callback = mem::transmute::<
+                extern "C" fn(irq: ResetTypes, ctx: *mut c_void),
+                extern "C" fn(irq: u32, ctx: *mut c_void),
+            >(callback);
             let _ = ffi::SYS_SetResetCallback(Some(callback));
         }
     }
