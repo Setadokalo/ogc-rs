@@ -6,7 +6,7 @@
 //! Most of the functions defined here are modified functions from
 //! the helpful project [water](https://github.com/lemarcuspoilus/water).
 
-use crate::{print, println};
+use crate::println;
 use core::{
     alloc::{GlobalAlloc, Layout},
     panic::PanicInfo,
