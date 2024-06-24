@@ -4,11 +4,13 @@
 
 use core::ffi::c_void;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 
 use alloc::vec::Vec;
 use bit_field::BitField;
 use ffi::GXTexObj;
 use libm::ceilf;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use voladdress::{Safe, VolAddress};
 
 use crate::ffi::{self, Mtx as Mtx34, Mtx44};
@@ -847,6 +849,24 @@ pub enum PosNmlMatrixSlot {
     Slot9 = ffi::GX_PNMTX9 as _,
 }
 
+#[repr(u8)]
+pub enum Channel {
+    R = 0,
+    G = 1,
+    B = 2,
+    A = 3
+}
+
+pub struct SwapMode(pub Channel, pub Channel, pub Channel, pub Channel);
+
+#[macro_export]
+macro_rules! swizzle {
+    ($($t:tt)+) => {
+        $crate::gx::SwapMode($($crate::gx::Channel::$t),+)
+    }
+
+}
+
 #[repr(u32)]
 pub enum TexMatrixSlot {
     Identity = ffi::GX_IDENTITY as _,
@@ -863,7 +883,7 @@ pub enum TexMatrixSlot {
 }
 
 /// Texture filter types
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum TexFilter {
     /// Point sampling, no mipmap
@@ -880,7 +900,7 @@ pub enum TexFilter {
     Linear = ffi::GX_LINEAR as _,
 }
 /// Texture filter types
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum TexFormat {
     TfA8 = ffi::GX_TF_A8 as u8,
@@ -915,40 +935,102 @@ impl TexFormat {
         }
     }
 }
-impl TryFrom<u8> for TexFormat {
-    type Error = ();
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        const GX_TF_A8:     u8 = ffi::GX_TF_A8 as u8;
-        const GX_TF_CI14:   u8 = ffi::GX_TF_CI14 as u8;
-        const GX_TF_CI4:    u8 = ffi::GX_TF_CI4 as u8;
-        const GX_TF_CI8:    u8 = ffi::GX_TF_CI8 as u8;
-        const GX_TF_CMPR:   u8 = ffi::GX_TF_CMPR as u8;
-        const GX_TF_I4:     u8 = ffi::GX_TF_I4 as u8;
-        const GX_TF_I8:     u8 = ffi::GX_TF_I8 as u8;
-        const GX_TF_IA4:    u8 = ffi::GX_TF_IA4 as u8;
-        const GX_TF_IA8:    u8 = ffi::GX_TF_IA8 as u8;
-        const GX_TF_RGB565: u8 = ffi::GX_TF_RGB565 as u8;
-        const GX_TF_RGB5A3: u8 = ffi::GX_TF_RGB5A3 as u8;
-        const GX_TF_RGBA8:  u8 = ffi::GX_TF_RGBA8 as u8;
-        Ok(match value {
-            GX_TF_A8 => Self::TfA8,
-            GX_TF_CI14 => Self::TfCi14,
-            GX_TF_CI4 => Self::TfCi4,
-            GX_TF_CI8 => Self::TfCi8,
-            GX_TF_CMPR => Self::TfCmpr,
-            GX_TF_I4 => Self::TfI4,
-            GX_TF_I8 => Self::TfI8,
-            GX_TF_IA4 => Self::TfIa4,
-            GX_TF_IA8 => Self::TfIa8,
-            GX_TF_RGB565 => Self::TfRgb565,
-            GX_TF_RGB5A3 => Self::TfRgb5a3,
-            GX_TF_RGBA8 => Self::TfRgba8,
-            _ => return Err(())
-        })
+/// Texture filter types
+#[derive(Copy, Clone, Debug, IntoPrimitive, TryFromPrimitive, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TlutFormat {
+    TfIa8    = ffi::GX_TL_IA8 as u8,
+    TfRgb565 = ffi::GX_TL_RGB565 as u8,
+    TfRgb5a3 = ffi::GX_TL_RGB5A3 as u8,
+}
+
+impl TlutFormat {
+    pub fn size_bits(self) -> usize {
+        match self {
+            TlutFormat::TfIa8    => 16,
+            TlutFormat::TfRgb565 => 16,
+            TlutFormat::TfRgb5a3 => 16
+        }
     }
 }
-#[derive(Debug, Clone, Copy)]
+
+#[derive(Debug, Clone, Copy, IntoPrimitive, TryFromPrimitive, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TevBias {
+    AddHalf = ffi::GX_TB_ADDHALF as _,
+    SubHalf = ffi::GX_TB_SUBHALF as _,
+    Zero    = ffi::GX_TB_ZERO as _,
+}
+
+#[derive(Debug, Clone, Copy, IntoPrimitive, TryFromPrimitive, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TevColorRegister {
+    Prev = ffi::GX_TEVPREV as _,
+    Reg0 = ffi::GX_TEVREG0 as _,
+    Reg1 = ffi::GX_TEVREG1 as _,
+    Reg2 = ffi::GX_TEVREG2 as _,
+}
+
+#[derive(Debug, Clone, Copy, IntoPrimitive, TryFromPrimitive, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TevAlphaIn {
+    Prev  = ffi::GX_CA_APREV as _,
+    Reg0  = ffi::GX_CA_A0 as _,
+    Reg1  = ffi::GX_CA_A1 as _,
+    Reg2  = ffi::GX_CA_A2 as _,
+    Konst = ffi::GX_CA_KONST as _,
+    Rast  = ffi::GX_CA_RASA as _,
+    Tex   = ffi::GX_CA_TEXA as _,
+    Zero  = ffi::GX_CA_ZERO as _,
+}
+
+#[derive(Debug, Clone, Copy, IntoPrimitive, TryFromPrimitive, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TevColorIn {
+    PrevAlpha  = ffi::GX_CC_APREV as _,
+    Reg0Alpha  = ffi::GX_CC_A0 as _,
+    Reg1Alpha  = ffi::GX_CC_A1 as _,
+    Reg2Alpha  = ffi::GX_CC_A2 as _,
+    PrevColor  = ffi::GX_CC_CPREV as _,
+    Reg0Color  = ffi::GX_CC_C0 as _,
+    Reg1Color  = ffi::GX_CC_C1 as _,
+    Reg2Color  = ffi::GX_CC_C2 as _,
+    Half       = ffi::GX_CC_HALF as _,
+    Konst      = ffi::GX_CC_KONST as _,
+    One        = ffi::GX_CC_ONE as _,
+    RastColor  = ffi::GX_CC_RASC as _,
+    RastAlpha  = ffi::GX_CC_RASA as _,
+    TexColor   = ffi::GX_CC_TEXC as _,
+    TexAlpha   = ffi::GX_CC_TEXA as _,
+    Zero       = ffi::GX_CC_ZERO as _,
+}
+
+#[derive(Debug, Clone, Copy, IntoPrimitive, TryFromPrimitive, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TevScale {
+    DivideBy2 = ffi::GX_CS_DIVIDE_2 as _,
+    NoScale   = ffi::GX_CS_SCALE_1 as _,
+    MulBy2    = ffi::GX_CS_SCALE_2 as _,
+    MulBy4    = ffi::GX_CS_SCALE_4 as _,
+}
+
+#[derive(Debug, Clone, Copy, IntoPrimitive, TryFromPrimitive, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TevCombineOp {
+    Add                 = ffi::GX_TEV_ADD as _,
+    Sub                 = ffi::GX_TEV_SUB as _,
+    CompareBgr24Greater = ffi::GX_TEV_COMP_BGR24_GT as _,
+    CompareBgr24Equal   = ffi::GX_TEV_COMP_BGR24_EQ as _,
+    CompareGr16Greater  = ffi::GX_TEV_COMP_GR16_GT as _,
+    CompareGr16Equal    = ffi::GX_TEV_COMP_GR16_EQ as _,
+    CompareR8Greater    = ffi::GX_TEV_COMP_R8_GT as _,
+    CompareR8Equal      = ffi::GX_TEV_COMP_R8_EQ as _,
+    CompareRgb8Greater  = ffi::GX_TEV_COMP_RGB8_GT as _,
+    CompareRgb8Equal    = ffi::GX_TEV_COMP_RGB8_EQ as _,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct TevStage(u8);
 
@@ -976,6 +1058,18 @@ impl From<TevStage> for u8 {
         t.0
     }
 }
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, IntoPrimitive, TryFromPrimitive)]
+pub enum TevOp {
+    Blend     = ffi::GX_BLEND as _,
+    Decal     = ffi::GX_DECAL as _,
+    Modulate  = ffi::GX_MODULATE as _,
+    PassColor = ffi::GX_PASSCLR as _,
+    Replace   = ffi::GX_REPLACE as _,
+
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct TexCoord(u8);
@@ -1051,29 +1145,30 @@ impl <const D: bool> From<TexMap<D>> for u32 {
     }
 }
 
+#[repr(transparent)]
+pub struct Tlut<'a>(ffi::GXTlutObj, PhantomData<&'a [u8]>);
+impl<'a> Tlut<'a> {
+    pub fn new(tlut_data: &[u8], format: TlutFormat) -> Self {
+        let mut m = MaybeUninit::<ffi::GXTlutObj>::zeroed();
+        unsafe { ffi::GX_InitTlutObj(
+            m.as_mut_ptr(),
+            tlut_data.as_ptr().cast_mut().cast(),
+            format as _,
+            ((tlut_data.len() * 8) / format.size_bits()) as u16
+        ); }
+
+        unsafe { Self(m.assume_init(), PhantomData) }
+    }
+}
+
+
 /// Texture wrap modes
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum WrapMode {
     Clamp = ffi::GX_CLAMP as _,
     Repeat = ffi::GX_REPEAT as _,
     Mirror = ffi::GX_MIRROR as _,
-}
-
-impl TryFrom<u8> for WrapMode {
-    type Error = ();
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        const GX_CLAMP:  u8 = ffi::GX_CLAMP  as _;
-        const GX_REPEAT: u8 = ffi::GX_REPEAT as _;
-        const GX_MIRROR: u8 = ffi::GX_MIRROR as _;
-        Ok(match value {
-            GX_CLAMP  => Self::Clamp,
-            GX_REPEAT => Self::Repeat,
-            GX_MIRROR => Self::Mirror,
-            _ => return Err(())
-        })
-    }
 }
 
 #[repr(transparent)]
@@ -1698,7 +1793,7 @@ impl Gx {
     /// Normally, Z buffering should happen before texturing, as this enables better performance by
     /// not texturing pixels that are not visible; however, when alpha compare is used, Z buffering
     /// must be done after texturing (see [`Gx::set_alpha_compare()`]).
-    pub fn set_zcomp_loc(before_tex: bool) {
+    pub fn set_zcomp_before_tex(before_tex: bool) {
         unsafe { ffi::GX_SetZCompLoc(before_tex as u8) }
     }
 
@@ -1958,16 +2053,59 @@ impl Gx {
         unsafe { ffi::GX_SetNumTexGens(nr) }
     }
 
+    /// Sets the number of TEV stages.
+    /// See [GX_SetNumTexGens](https://libogc.devkitpro.org/gx_8h.html#a55a79a1688d3a6957ee0c37d6323d159) for more.
+    pub fn set_num_tev_stages(nr: u8) {
+        unsafe { ffi::GX_SetNumTevStages(nr) }
+    }
+
+    /// Sets the inputs to the alpha combiner part of a TEV stage.
+    /// The color combiner applies the function `(base <tevop> lerp(a, b, mix) + tevbias) * tevscale`.
+    /// `tevbias` and `tevscale` are defined in [`Gx::set_tev_alpha_op()`].
+    pub fn set_tev_alpha_in(tevstage: TevStage, a: TevAlphaIn, b: TevAlphaIn, mix: TevAlphaIn, base: TevAlphaIn) {
+        unsafe { ffi::GX_SetTevAlphaIn(tevstage.into(), a.into(), b.into(), mix.into(), base.into()) }
+    }
+
+    pub fn set_tev_alpha_op(tevstage: TevStage, op: TevCombineOp, bias: TevBias, scale: TevScale, clamp: bool, out_reg: TevColorRegister) {
+        unsafe { ffi::GX_SetTevAlphaOp(tevstage.into(), op.into(), bias.into(), scale.into(), clamp as u8, out_reg.into()) }
+    }
+
+    /// Sets the inputs to the color combiner part of a TEV stage.
+    /// The color combiner applies the function `(base <tevop> lerp(a, b, mix) + tevbias) * tevscale`.
+    /// `tevbias` and `tevscale` are defined in [`Gx::set_tev_color_op()`].
+    pub fn set_tev_color_in(tevstage: TevStage, a: TevColorIn, b: TevColorIn, mix: TevColorIn, base: TevColorIn) {
+        unsafe { ffi::GX_SetTevColorIn(tevstage.into(), a.into(), b.into(), mix.into(), base.into()) }
+    }
+
+    pub fn set_tev_color_op(tevstage: TevStage, op: TevCombineOp, bias: TevBias, scale: TevScale, clamp: bool, out_reg: TevColorRegister) {
+        unsafe { ffi::GX_SetTevColorOp(tevstage.into(), op.into(), bias.into(), scale.into(), clamp as u8, out_reg.into()) }
+    }
+
+    /// Sets the operations for both the color and alpha combiner parts of a TEV stage at the same time.
+    /// Convenience function for calling [`set_tev_color_op()`] and [`set_tev_alpha_op()`] with identical settings.
+    pub fn set_tev_both_ops(tevstage: TevStage, op: TevCombineOp, bias: TevBias, scale: TevScale, clamp: bool, out_reg: TevColorRegister) {
+        Self::set_tev_color_op(tevstage, op, bias, scale, clamp, out_reg);
+        Self::set_tev_alpha_op(tevstage, op, bias, scale, clamp, out_reg);
+    }
+
     /// Simplified function to set various TEV parameters for this tevstage based on a predefined combiner mode.
     /// See [GX_SetTevOp](https://libogc.devkitpro.org/gx_8h.html#a68554713cdde7b45ae4d5ce156239cf8) for more.
-    pub fn set_tev_op(tevstage: TevStage, mode: u8) {
-        unsafe { ffi::GX_SetTevOp(tevstage.into(), mode) }
+    pub fn set_tev_op(tevstage: TevStage, mode: TevOp) {
+        unsafe { ffi::GX_SetTevOp(tevstage.into(), mode.into()) }
     }
 
     /// Specifies the texture and rasterized color that will be available as inputs to this TEV tevstage.
     /// See [GX_SetTevOrder](https://libogc.devkitpro.org/gx_8h.html#ae64799e52298de39efc74bf989fc57f5) for more.
     pub fn set_tev_order(tevstage: TevStage, texcoord: TexCoord, texmap: TexMap<true>, color: u8) {
         unsafe { ffi::GX_SetTevOrder(tevstage.into(), texcoord.into(), texmap.into(), color) }
+    }
+
+    pub fn set_tev_swap_mode(tevstage: TevStage, rasterized_swap_entry: u8, texture_swap_entry: u8) {
+        unsafe { ffi::GX_SetTevSwapMode(tevstage.into(), rasterized_swap_entry, texture_swap_entry) }
+    }
+    
+    pub fn set_tev_swap_mode_table(swap_entry: u8, swaps: SwapMode ) {
+        unsafe { ffi::GX_SetTevSwapModeTable(swap_entry, swaps.0 as _, swaps.1 as _, swaps.2 as _, swaps.3 as _) }
     }
 
     /// Specifies how texture coordinates are generated.
@@ -2004,6 +2142,10 @@ impl Gx {
     /// [`Gx::load_tlut()`]) before calling this function.
     pub fn load_texture(obj: &Texture, mapid: TexMap<false>) {
         unsafe { ffi::GX_LoadTexObj((&obj.0) as *const _ as *mut _, u32::from(mapid) as u8) }
+    }
+
+    pub fn load_tlut(obj: &Tlut, tlut_name: u32) {
+        unsafe { ffi::GX_LoadTlut((&obj.0) as *const _ as *mut _, tlut_name) }
     }
 
     /// Sets the projection matrix.
@@ -2184,7 +2326,6 @@ impl Gx {
         unsafe { ffi::GX_SetAlphaCompare(comp0 as u8, ref0, aop as u8, comp1 as u8, ref1) }
     }
 
-    /// Sets the parameters for the alpha compare function which uses the alpha output from the last active TEV stage.
     /// See [GX_SetClipMode](https://libogc.devkitpro.org/gx_8h.html#a3d348d7af8ded25b57352e956f43d974) for more.
     pub fn set_clip_mode(enable: bool) {
         // GX_CLIP_DISABLE is 1, so invert the enable parameter before int conversion
@@ -2497,6 +2638,95 @@ impl Gx {
         }
 
         for byte in t_bytes {
+            GX_PIPE.write(byte);
+        }
+    }
+
+
+    #[inline]
+    pub fn tex_coord_2u16(s: u16, t: u16) {
+        let s_bytes = s.to_be_bytes();
+        let t_bytes = t.to_be_bytes();
+
+        for byte in s_bytes {
+            GX_PIPE.write(byte);
+        }
+
+        for byte in t_bytes {
+            GX_PIPE.write(byte);
+        }
+    }
+
+    #[inline]
+    pub fn tex_coord_2i16(s: i16, t: i16) {
+        let s_bytes = s.to_be_bytes();
+        let t_bytes = t.to_be_bytes();
+
+        for byte in s_bytes {
+            GX_PIPE.write(byte);
+        }
+
+        for byte in t_bytes {
+            GX_PIPE.write(byte);
+        }
+    }
+
+    #[inline]
+    pub fn tex_coord_2u8(s: u8, t: u8) {
+        let s_bytes = s.to_be_bytes();
+        let t_bytes = t.to_be_bytes();
+
+        for byte in s_bytes {
+            GX_PIPE.write(byte);
+        }
+
+        for byte in t_bytes {
+            GX_PIPE.write(byte);
+        }
+    }
+
+    #[inline]
+    pub fn tex_coord_2i8(s: i8, t: i8) {
+        let s_bytes = s.to_be_bytes();
+        let t_bytes = t.to_be_bytes();
+
+        for byte in s_bytes {
+            GX_PIPE.write(byte);
+        }
+
+        for byte in t_bytes {
+            GX_PIPE.write(byte);
+        }
+    }
+
+    #[inline]
+    pub fn tex_coord_1u8(index: u8) {
+        let idx_bytes = index.to_be_bytes();
+        for byte in idx_bytes {
+            GX_PIPE.write(byte);
+        }
+    }
+
+    #[inline]
+    pub fn tex_coord_1i8(index: i8) {
+        let idx_bytes = index.to_be_bytes();
+        for byte in idx_bytes {
+            GX_PIPE.write(byte);
+        }
+    }
+
+    #[inline]
+    pub fn tex_coord1x8(index: u8) {
+        let idx_bytes = index.to_be_bytes();
+        for byte in idx_bytes {
+            GX_PIPE.write(byte);
+        }
+    }
+
+    #[inline]
+    pub fn tex_coord1x16(index: u16) {
+        let idx_bytes = index.to_be_bytes();
+        for byte in idx_bytes {
             GX_PIPE.write(byte);
         }
     }
