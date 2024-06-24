@@ -62,11 +62,9 @@ mod console_printing {
     /// Prints to the standard output, with a newline.
     #[macro_export]
     macro_rules! println {
-        () => (print!("\n"));
-      //   ($fmt:expr) => (print!(concat!($fmt, "\n")));
-        ($fmt:expr $(, $($arg:tt)*)?) => {
-            let mut s = ::alloc::fmt::format(format_args!($fmt $(, $($arg)*)?));
-				s.push('\n');
+		  ($($arg:tt)*) => {
+            let mut s = ::alloc::fmt::format(format_args!($($arg)*));
+            s.push('\n');
             $crate::console::Console::print(&s);
 		  }
     }
@@ -270,7 +268,7 @@ macro_rules! include_bytes_aligned {
             pub bytes: Bytes,
         }
 
-        static ALIGNED: &AlignedAs::<[u8]> = &AlignedAs {
+        const ALIGNED: &AlignedAs::<[u8]> = &AlignedAs {
             bytes: *include_bytes!($path),
         };
 
